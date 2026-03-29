@@ -1228,11 +1228,42 @@ function MainTerminal({
   );
 }
 
+// --- ХЕЛПЕРЫ ХРАНИЛИЩА ---
+const LS_USERS = "ip7_users";
+const LS_SECTIONS = "ip7_sections";
+
+function loadUsers(): User[] {
+  try {
+    const raw = localStorage.getItem(LS_USERS);
+    if (raw) return JSON.parse(raw) as User[];
+  } catch (e) { console.warn(e); }
+  return initUsers;
+}
+
+function loadSections(): Record<Section, SectionData> {
+  try {
+    const raw = localStorage.getItem(LS_SECTIONS);
+    if (raw) return JSON.parse(raw) as Record<Section, SectionData>;
+  } catch (e) { console.warn(e); }
+  return initSections;
+}
+
 // --- КОРЕНЬ ---
 export default function Index() {
   const [user, setUser] = useState<User | null>(null);
-  const [users, setUsers] = useState<User[]>(initUsers);
-  const [sections, setSections] = useState<Record<Section, SectionData>>(initSections);
+  const [users, setUsers] = useState<User[]>(loadUsers);
+  const [sections, setSections] = useState<Record<Section, SectionData>>(loadSections);
+
+  const handleUsersChange = (updated: User[]) => {
+    setUsers(updated);
+    localStorage.setItem(LS_USERS, JSON.stringify(updated));
+    setUser(prev => prev ? (updated.find(u => u.id === prev.id) || prev) : null);
+  };
+
+  const handleSectionsChange = (updated: Record<Section, SectionData>) => {
+    setSections(updated);
+    localStorage.setItem(LS_SECTIONS, JSON.stringify(updated));
+  };
 
   if (!user) {
     return <LoginScreen onLogin={(u) => {
@@ -1247,11 +1278,8 @@ export default function Index() {
       onLogout={() => setUser(null)}
       users={users}
       sections={sections}
-      onUsersChange={(updated) => {
-        setUsers(updated);
-        setUser(prev => prev ? (updated.find(u => u.id === prev.id) || prev) : null);
-      }}
-      onSectionsChange={setSections}
+      onUsersChange={handleUsersChange}
+      onSectionsChange={handleSectionsChange}
     />
   );
 }

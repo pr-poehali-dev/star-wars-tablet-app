@@ -442,7 +442,10 @@ function AdminPanel({
     };
 
     const save = () => {
-      if (!form.callsign || !form.rank || !form.password) { setErr("Заполните все поля"); return; }
+      if (!form.login || !form.callsign || !form.rank || !form.password) { setErr("Заполните все поля"); return; }
+      if (users.find(u => u.login.toLowerCase() === form.login.toLowerCase() && u.id !== form.id)) {
+        setErr("Такой логин уже занят"); return;
+      }
       onUsersChange(users.map(u => u.id === form.id ? form : u));
       onDone();
     };
@@ -451,9 +454,11 @@ function AdminPanel({
       <div className="space-y-3">
         <div>
           <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>ЛОГИН</label>
-          <div className="sw-input w-full px-3 py-2 rounded text-sm font-mono-sw" style={{ color: "var(--sw-text-dim)", opacity: 0.6 }}>
-            {form.login}
-          </div>
+          <input
+            className="sw-input w-full px-3 py-2 rounded text-sm"
+            value={form.login}
+            onChange={e => setForm(p => ({ ...p, login: e.target.value }))}
+          />
         </div>
         <div>
           <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>ПАРОЛЬ</label>

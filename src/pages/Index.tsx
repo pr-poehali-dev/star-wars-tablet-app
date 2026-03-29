@@ -308,6 +308,354 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
+// --- КОНСТАНТЫ МЕТОК ---
+const SECTION_LABELS: Record<Section, string> = {
+  "docs-schools": "Документация — Школы",
+  "docs-general": "Документация — Общая",
+  "statutes": "Уставы",
+  "references": "Справочные материалы",
+  "schemes": "Схемы",
+};
+
+const ROLE_LABELS: Record<Role, string> = {
+  admin: "Администратор",
+  pilot: "Пилот",
+  engineer: "Инженер",
+};
+
+// --- ФОРМА ДОБАВЛЕНИЯ ПОЛЬЗОВАТЕЛЯ ---
+function AddUserForm({ users, onUsersChange, onDone }: {
+  users: User[]; onUsersChange: (u: User[]) => void; onDone: () => void;
+}) {
+  const [form, setForm] = useState({
+    login: "", password: "", callsign: "", rank: "", role: "pilot" as Role,
+    allowedSections: [] as Section[]
+  });
+  const [err, setErr] = useState("");
+
+  const toggle = (s: Section) => setForm(f => ({
+    ...f,
+    allowedSections: f.allowedSections.includes(s)
+      ? f.allowedSections.filter(x => x !== s)
+      : [...f.allowedSections, s]
+  }));
+
+  const save = () => {
+    if (!form.login || !form.password || !form.callsign || !form.rank) { setErr("Заполните все поля"); return; }
+    if (users.find(u => u.login.toLowerCase() === form.login.toLowerCase())) { setErr("Такой логин уже существует"); return; }
+    onUsersChange([...users, { id: genId(), ...form }]);
+    onDone();
+  };
+
+  return (
+    <div className="space-y-3">
+      {[
+        { label: "ЛОГИН", key: "login", placeholder: "pilot02" },
+        { label: "ПАРОЛЬ", key: "password", placeholder: "••••••••" },
+        { label: "ПОЗЫВНОЙ", key: "callsign", placeholder: "Вепрь" },
+        { label: "ЗВАНИЕ", key: "rank", placeholder: "Капитан" },
+      ].map(f => (
+        <div key={f.key}>
+          <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>{f.label}</label>
+          <input
+            type={f.key === "password" ? "password" : "text"}
+            className="sw-input w-full px-3 py-2 rounded text-sm"
+            placeholder={f.placeholder}
+            value={(form as Record<string, string>)[f.key]}
+            onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+          />
+        </div>
+      ))}
+      <div>
+        <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>РОЛЬ</label>
+        <select className="sw-input w-full px-3 py-2 rounded text-sm" value={form.role}
+          onChange={e => setForm(p => ({ ...p, role: e.target.value as Role }))}>
+          <option value="pilot">Пилот</option>
+          <option value="engineer">Инженер</option>
+          <option value="admin">Администратор</option>
+        </select>
+      </div>
+      <div>
+        <label className="font-mono-sw text-xs block mb-2" style={{ color: "var(--sw-text-dim)" }}>ДОСТУП К РАЗДЕЛАМ</label>
+        <div className="space-y-1.5">
+          {ALL_SECTIONS.map(s => (
+            <label key={s} className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={form.allowedSections.includes(s)}
+                onChange={() => toggle(s)} className="accent-orange-400" />
+              <span className="font-rajdhani text-sm" style={{ color: "#8fa8bf" }}>{SECTION_LABELS[s]}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+      {err && <p className="font-mono-sw text-xs" style={{ color: "#ef4444" }}>{err}</p>}
+      <div className="flex gap-2 pt-2">
+        <button onClick={save} className="flex-1 py-2 rounded font-orbitron text-xs font-bold"
+          style={{ background: "var(--sw-orange)", color: "#070b0f" }}>СОЗДАТЬ</button>
+        <button onClick={onDone} className="flex-1 py-2 rounded font-orbitron text-xs font-bold"
+          style={{ border: "1px solid var(--sw-border)", color: "var(--sw-text-dim)", background: "transparent" }}>ОТМЕНА</button>
+      </div>
+    </div>
+  );
+}
+
+// --- ФОРМА РЕДАКТИРОВАНИЯ ПОЛЬЗОВАТЕЛЯ ---
+function EditUserForm({ editTarget, users, onUsersChange, onDone }: {
+  editTarget: User; users: User[]; onUsersChange: (u: User[]) => void; onDone: () => void;
+}) {
+  const [form, setForm] = useState({ ...editTarget });
+  const [err, setErr] = useState("");
+
+  const toggle = (s: Section) => setForm(f => ({
+    ...f,
+    allowedSections: f.allowedSections.includes(s)
+      ? f.allowedSections.filter(x => x !== s)
+      : [...f.allowedSections, s]
+  }));
+
+  const save = () => {
+    if (!form.login || !form.callsign || !form.rank || !form.password) { setErr("Заполните все поля"); return; }
+    if (users.find(u => u.login.toLowerCase() === form.login.toLowerCase() && u.id !== form.id)) {
+      setErr("Такой логин уже занят"); return;
+    }
+    onUsersChange(users.map(u => u.id === form.id ? form : u));
+    onDone();
+  };
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>ЛОГИН</label>
+        <input className="sw-input w-full px-3 py-2 rounded text-sm" value={form.login}
+          onChange={e => setForm(p => ({ ...p, login: e.target.value }))} />
+      </div>
+      <div>
+        <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>ПАРОЛЬ</label>
+        <input type="password" className="sw-input w-full px-3 py-2 rounded text-sm"
+          placeholder="новый пароль" value={form.password}
+          onChange={e => setForm(p => ({ ...p, password: e.target.value }))} />
+      </div>
+      {[
+        { label: "ПОЗЫВНОЙ", key: "callsign" },
+        { label: "ЗВАНИЕ", key: "rank" },
+      ].map(f => (
+        <div key={f.key}>
+          <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>{f.label}</label>
+          <input className="sw-input w-full px-3 py-2 rounded text-sm"
+            value={(form as Record<string, string>)[f.key]}
+            onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))} />
+        </div>
+      ))}
+      <div>
+        <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>РОЛЬ</label>
+        <select className="sw-input w-full px-3 py-2 rounded text-sm" value={form.role}
+          onChange={e => setForm(p => ({ ...p, role: e.target.value as Role }))}>
+          <option value="pilot">Пилот</option>
+          <option value="engineer">Инженер</option>
+          <option value="admin">Администратор</option>
+        </select>
+      </div>
+      <div>
+        <label className="font-mono-sw text-xs block mb-2" style={{ color: "var(--sw-text-dim)" }}>ДОСТУП К РАЗДЕЛАМ</label>
+        <div className="space-y-1.5">
+          {ALL_SECTIONS.map(s => (
+            <label key={s} className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={form.allowedSections.includes(s)}
+                onChange={() => toggle(s)} className="accent-orange-400" />
+              <span className="font-rajdhani text-sm" style={{ color: "#8fa8bf" }}>{SECTION_LABELS[s]}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+      {err && <p className="font-mono-sw text-xs" style={{ color: "#ef4444" }}>{err}</p>}
+      <div className="flex gap-2 pt-2">
+        <button onClick={save} className="flex-1 py-2 rounded font-orbitron text-xs font-bold"
+          style={{ background: "var(--sw-orange)", color: "#070b0f" }}>СОХРАНИТЬ</button>
+        <button onClick={onDone} className="flex-1 py-2 rounded font-orbitron text-xs font-bold"
+          style={{ border: "1px solid var(--sw-border)", color: "var(--sw-text-dim)", background: "transparent" }}>ОТМЕНА</button>
+      </div>
+    </div>
+  );
+}
+
+// --- ФОРМА ДОБАВЛЕНИЯ ДОКУМЕНТА ---
+function AddDocForm({ section, sections, onSectionsChange, onDone }: {
+  section: Section; sections: Record<Section, SectionData>;
+  onSectionsChange: (s: Record<Section, SectionData>) => void; onDone: () => void;
+}) {
+  const [form, setForm] = useState({
+    title: "", tag: "", status: "Актуально",
+    allowedRoles: ["admin", "pilot", "engineer"] as Role[], fileUrl: "", fileName: ""
+  });
+  const [err, setErr] = useState("");
+  const localRef = useRef<HTMLInputElement>(null);
+
+  const toggleRole = (r: Role) => setForm(f => ({
+    ...f,
+    allowedRoles: f.allowedRoles.includes(r)
+      ? f.allowedRoles.filter(x => x !== r)
+      : [...f.allowedRoles, r]
+  }));
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setForm(p => ({ ...p, fileUrl: URL.createObjectURL(file), fileName: file.name }));
+  };
+
+  const save = () => {
+    if (!form.title || !form.tag) { setErr("Укажите название и тег"); return; }
+    const prefix = section === "docs-schools" ? "DS" : section === "docs-general" ? "DG"
+      : section === "statutes" ? "ST" : section === "references" ? "RF" : "SC";
+    const nums = sections[section].items.map(i => parseInt(i.id.split("-")[1])).filter(n => !isNaN(n));
+    const nextNum = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+    const newDoc: DocItem = {
+      id: `${prefix}-${String(nextNum).padStart(3, "0")}`,
+      title: form.title, tag: form.tag, status: form.status,
+      date: today(), allowedRoles: form.allowedRoles,
+      fileUrl: form.fileUrl || undefined, fileName: form.fileName || undefined
+    };
+    onSectionsChange({ ...sections, [section]: { ...sections[section], items: [...sections[section].items, newDoc] } });
+    onDone();
+  };
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>НАЗВАНИЕ</label>
+        <input className="sw-input w-full px-3 py-2 rounded text-sm" value={form.title}
+          onChange={e => setForm(p => ({ ...p, title: e.target.value }))} placeholder="Название документа" />
+      </div>
+      <div>
+        <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>ТЕГ</label>
+        <input className="sw-input w-full px-3 py-2 rounded text-sm" value={form.tag}
+          onChange={e => setForm(p => ({ ...p, tag: e.target.value }))} placeholder="Тактика" />
+      </div>
+      <div>
+        <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>СТАТУС</label>
+        <select className="sw-input w-full px-3 py-2 rounded text-sm" value={form.status}
+          onChange={e => setForm(p => ({ ...p, status: e.target.value }))}>
+          {["Актуально", "На ревизии", "Пересмотр", "Архив", "Секретно"].map(s => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className="font-mono-sw text-xs block mb-2" style={{ color: "var(--sw-text-dim)" }}>ДОСТУП ДЛЯ РОЛЕЙ</label>
+        <div className="flex gap-4">
+          {(["admin", "pilot", "engineer"] as Role[]).map(r => (
+            <label key={r} className="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" checked={form.allowedRoles.includes(r)}
+                onChange={() => toggleRole(r)} className="accent-orange-400" />
+              <span className="font-rajdhani text-sm" style={{ color: "#8fa8bf" }}>{ROLE_LABELS[r]}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+      <div>
+        <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>ФАЙЛ (необязательно)</label>
+        <input type="file" ref={localRef} className="hidden" onChange={handleFile} />
+        <button onClick={() => localRef.current?.click()} className="w-full py-2 rounded text-sm font-mono-sw"
+          style={{ border: "1px dashed var(--sw-border)", color: "var(--sw-text-dim)", background: "transparent" }}>
+          {form.fileName ? `📎 ${form.fileName}` : "Выбрать файл..."}
+        </button>
+      </div>
+      {err && <p className="font-mono-sw text-xs" style={{ color: "#ef4444" }}>{err}</p>}
+      <div className="flex gap-2 pt-2">
+        <button onClick={save} className="flex-1 py-2 rounded font-orbitron text-xs font-bold"
+          style={{ background: "var(--sw-orange)", color: "#070b0f" }}>ДОБАВИТЬ</button>
+        <button onClick={onDone} className="flex-1 py-2 rounded font-orbitron text-xs font-bold"
+          style={{ border: "1px solid var(--sw-border)", color: "var(--sw-text-dim)", background: "transparent" }}>ОТМЕНА</button>
+      </div>
+    </div>
+  );
+}
+
+// --- ФОРМА РЕДАКТИРОВАНИЯ ДОКУМЕНТА ---
+function EditDocForm({ section, doc, sections, onSectionsChange, onDone }: {
+  section: Section; doc: DocItem; sections: Record<Section, SectionData>;
+  onSectionsChange: (s: Record<Section, SectionData>) => void; onDone: () => void;
+}) {
+  const [form, setForm] = useState({ ...doc });
+  const [err, setErr] = useState("");
+  const localRef = useRef<HTMLInputElement>(null);
+
+  const toggleRole = (r: Role) => setForm(f => ({
+    ...f,
+    allowedRoles: f.allowedRoles.includes(r)
+      ? f.allowedRoles.filter(x => x !== r)
+      : [...f.allowedRoles, r]
+  }));
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setForm(p => ({ ...p, fileUrl: URL.createObjectURL(file), fileName: file.name }));
+  };
+
+  const save = () => {
+    if (!form.title || !form.tag) { setErr("Укажите название и тег"); return; }
+    onSectionsChange({
+      ...sections,
+      [section]: {
+        ...sections[section],
+        items: sections[section].items.map(i => i.id === form.id ? { ...form, date: today() } : i)
+      }
+    });
+    onDone();
+  };
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>НАЗВАНИЕ</label>
+        <input className="sw-input w-full px-3 py-2 rounded text-sm" value={form.title}
+          onChange={e => setForm(p => ({ ...p, title: e.target.value }))} />
+      </div>
+      <div>
+        <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>ТЕГ</label>
+        <input className="sw-input w-full px-3 py-2 rounded text-sm" value={form.tag}
+          onChange={e => setForm(p => ({ ...p, tag: e.target.value }))} />
+      </div>
+      <div>
+        <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>СТАТУС</label>
+        <select className="sw-input w-full px-3 py-2 rounded text-sm" value={form.status}
+          onChange={e => setForm(p => ({ ...p, status: e.target.value }))}>
+          {["Актуально", "На ревизии", "Пересмотр", "Архив", "Секретно"].map(s => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className="font-mono-sw text-xs block mb-2" style={{ color: "var(--sw-text-dim)" }}>ДОСТУП ДЛЯ РОЛЕЙ</label>
+        <div className="flex gap-4">
+          {(["admin", "pilot", "engineer"] as Role[]).map(r => (
+            <label key={r} className="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" checked={form.allowedRoles.includes(r)}
+                onChange={() => toggleRole(r)} className="accent-orange-400" />
+              <span className="font-rajdhani text-sm" style={{ color: "#8fa8bf" }}>{ROLE_LABELS[r]}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+      <div>
+        <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>ФАЙЛ</label>
+        <input type="file" ref={localRef} className="hidden" onChange={handleFile} />
+        <button onClick={() => localRef.current?.click()} className="w-full py-2 rounded text-sm font-mono-sw"
+          style={{ border: "1px dashed var(--sw-border)", color: "var(--sw-text-dim)", background: "transparent" }}>
+          {form.fileName ? `📎 ${form.fileName}` : "Заменить файл..."}
+        </button>
+      </div>
+      {err && <p className="font-mono-sw text-xs" style={{ color: "#ef4444" }}>{err}</p>}
+      <div className="flex gap-2 pt-2">
+        <button onClick={save} className="flex-1 py-2 rounded font-orbitron text-xs font-bold"
+          style={{ background: "var(--sw-orange)", color: "#070b0f" }}>СОХРАНИТЬ</button>
+        <button onClick={onDone} className="flex-1 py-2 rounded font-orbitron text-xs font-bold"
+          style={{ border: "1px solid var(--sw-border)", color: "var(--sw-text-dim)", background: "transparent" }}>ОТМЕНА</button>
+      </div>
+    </div>
+  );
+}
+
 // --- ПАНЕЛЬ АДМИНИСТРАТОРА ---
 function AdminPanel({
   users, sections, onUsersChange, onSectionsChange
@@ -325,392 +673,6 @@ function AdminPanel({
   const [editDoc, setEditDoc] = useState<{ section: Section; doc: DocItem } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editFileRef = useRef<HTMLInputElement>(null);
-
-  const SECTION_LABELS: Record<Section, string> = {
-    "docs-schools": "Документация — Школы",
-    "docs-general": "Документация — Общая",
-    "statutes": "Уставы",
-    "references": "Справочные материалы",
-    "schemes": "Схемы",
-  };
-
-  const ROLE_LABELS: Record<Role, string> = {
-    admin: "Администратор",
-    pilot: "Пилот",
-    engineer: "Инженер",
-  };
-
-  // Форма добавления пользователя
-  function AddUserForm({ onDone }: { onDone: () => void }) {
-    const [form, setForm] = useState({
-      login: "", password: "", callsign: "", rank: "", role: "pilot" as Role,
-      allowedSections: [] as Section[]
-    });
-    const [err, setErr] = useState("");
-
-    const toggle = (s: Section) => {
-      setForm(f => ({
-        ...f,
-        allowedSections: f.allowedSections.includes(s)
-          ? f.allowedSections.filter(x => x !== s)
-          : [...f.allowedSections, s]
-      }));
-    };
-
-    const save = () => {
-      if (!form.login || !form.password || !form.callsign || !form.rank) { setErr("Заполните все поля"); return; }
-      if (users.find(u => u.login.toLowerCase() === form.login.toLowerCase())) { setErr("Такой логин уже существует"); return; }
-      const newUser: User = { id: genId(), ...form };
-      onUsersChange([...users, newUser]);
-      onDone();
-    };
-
-    return (
-      <div className="space-y-3">
-        {[
-          { label: "ЛОГИН", key: "login", placeholder: "pilot02" },
-          { label: "ПАРОЛЬ", key: "password", placeholder: "••••••••" },
-          { label: "ПОЗЫВНОЙ", key: "callsign", placeholder: "Вепрь" },
-          { label: "ЗВАНИЕ", key: "rank", placeholder: "Капитан" },
-        ].map(f => (
-          <div key={f.key}>
-            <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>{f.label}</label>
-            <input
-              type={f.key === "password" ? "password" : "text"}
-              className="sw-input w-full px-3 py-2 rounded text-sm"
-              placeholder={f.placeholder}
-              value={(form as Record<string, string>)[f.key]}
-              onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-            />
-          </div>
-        ))}
-        <div>
-          <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>РОЛЬ</label>
-          <select
-            className="sw-input w-full px-3 py-2 rounded text-sm"
-            value={form.role}
-            onChange={e => setForm(p => ({ ...p, role: e.target.value as Role }))}
-          >
-            <option value="pilot">Пилот</option>
-            <option value="engineer">Инженер</option>
-            <option value="admin">Администратор</option>
-          </select>
-        </div>
-        <div>
-          <label className="font-mono-sw text-xs block mb-2" style={{ color: "var(--sw-text-dim)" }}>ДОСТУП К РАЗДЕЛАМ</label>
-          <div className="space-y-1.5">
-            {ALL_SECTIONS.map(s => (
-              <label key={s} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.allowedSections.includes(s)}
-                  onChange={() => toggle(s)}
-                  className="accent-orange-400"
-                />
-                <span className="font-rajdhani text-sm" style={{ color: "#8fa8bf" }}>{SECTION_LABELS[s]}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-        {err && <p className="font-mono-sw text-xs" style={{ color: "#ef4444" }}>{err}</p>}
-        <div className="flex gap-2 pt-2">
-          <button onClick={save} className="flex-1 py-2 rounded font-orbitron text-xs font-bold"
-            style={{ background: "var(--sw-orange)", color: "#070b0f" }}>
-            СОЗДАТЬ
-          </button>
-          <button onClick={onDone} className="flex-1 py-2 rounded font-orbitron text-xs font-bold"
-            style={{ border: "1px solid var(--sw-border)", color: "var(--sw-text-dim)", background: "transparent" }}>
-            ОТМЕНА
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Форма редактирования пользователя
-  function EditUserForm({ user, onDone }: { user: User; onDone: () => void }) {
-    const [form, setForm] = useState({ ...user });
-    const [err, setErr] = useState("");
-
-    const toggle = (s: Section) => {
-      setForm(f => ({
-        ...f,
-        allowedSections: f.allowedSections.includes(s)
-          ? f.allowedSections.filter(x => x !== s)
-          : [...f.allowedSections, s]
-      }));
-    };
-
-    const save = () => {
-      if (!form.login || !form.callsign || !form.rank || !form.password) { setErr("Заполните все поля"); return; }
-      if (users.find(u => u.login.toLowerCase() === form.login.toLowerCase() && u.id !== form.id)) {
-        setErr("Такой логин уже занят"); return;
-      }
-      onUsersChange(users.map(u => u.id === form.id ? form : u));
-      onDone();
-    };
-
-    return (
-      <div className="space-y-3">
-        <div>
-          <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>ЛОГИН</label>
-          <input
-            className="sw-input w-full px-3 py-2 rounded text-sm"
-            value={form.login}
-            onChange={e => setForm(p => ({ ...p, login: e.target.value }))}
-          />
-        </div>
-        <div>
-          <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>ПАРОЛЬ</label>
-          <input
-            type="password"
-            className="sw-input w-full px-3 py-2 rounded text-sm"
-            placeholder="новый пароль"
-            value={form.password}
-            onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
-          />
-        </div>
-        {[
-          { label: "ПОЗЫВНОЙ", key: "callsign", placeholder: "Вепрь" },
-          { label: "ЗВАНИЕ", key: "rank", placeholder: "Капитан" },
-        ].map(f => (
-          <div key={f.key}>
-            <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>{f.label}</label>
-            <input
-              className="sw-input w-full px-3 py-2 rounded text-sm"
-              value={(form as Record<string, string>)[f.key]}
-              onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-            />
-          </div>
-        ))}
-        <div>
-          <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>РОЛЬ</label>
-          <select
-            className="sw-input w-full px-3 py-2 rounded text-sm"
-            value={form.role}
-            onChange={e => setForm(p => ({ ...p, role: e.target.value as Role }))}
-          >
-            <option value="pilot">Пилот</option>
-            <option value="engineer">Инженер</option>
-            <option value="admin">Администратор</option>
-          </select>
-        </div>
-        <div>
-          <label className="font-mono-sw text-xs block mb-2" style={{ color: "var(--sw-text-dim)" }}>ДОСТУП К РАЗДЕЛАМ</label>
-          <div className="space-y-1.5">
-            {ALL_SECTIONS.map(s => (
-              <label key={s} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.allowedSections.includes(s)}
-                  onChange={() => toggle(s)}
-                  className="accent-orange-400"
-                />
-                <span className="font-rajdhani text-sm" style={{ color: "#8fa8bf" }}>{SECTION_LABELS[s]}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-        {err && <p className="font-mono-sw text-xs" style={{ color: "#ef4444" }}>{err}</p>}
-        <div className="flex gap-2 pt-2">
-          <button onClick={save} className="flex-1 py-2 rounded font-orbitron text-xs font-bold"
-            style={{ background: "var(--sw-orange)", color: "#070b0f" }}>
-            СОХРАНИТЬ
-          </button>
-          <button onClick={onDone} className="flex-1 py-2 rounded font-orbitron text-xs font-bold"
-            style={{ border: "1px solid var(--sw-border)", color: "var(--sw-text-dim)", background: "transparent" }}>
-            ОТМЕНА
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Форма добавления документа
-  function AddDocForm({ section, onDone }: { section: Section; onDone: () => void }) {
-    const [form, setForm] = useState({
-      title: "", tag: "", status: "Актуально", allowedRoles: ["admin", "pilot", "engineer"] as Role[],
-      fileUrl: "", fileName: ""
-    });
-    const [err, setErr] = useState("");
-    const localRef = useRef<HTMLInputElement>(null);
-
-    const toggleRole = (r: Role) => {
-      setForm(f => ({
-        ...f,
-        allowedRoles: f.allowedRoles.includes(r)
-          ? f.allowedRoles.filter(x => x !== r)
-          : [...f.allowedRoles, r]
-      }));
-    };
-
-    const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      const url = URL.createObjectURL(file);
-      setForm(p => ({ ...p, fileUrl: url, fileName: file.name }));
-    };
-
-    const save = () => {
-      if (!form.title || !form.tag) { setErr("Укажите название и тег"); return; }
-      const sectionIds = sections[section].items.map(i => i.id);
-      const prefix = section === "docs-schools" ? "DS" : section === "docs-general" ? "DG"
-        : section === "statutes" ? "ST" : section === "references" ? "RF" : "SC";
-      const nums = sectionIds.map(id => parseInt(id.split("-")[1])).filter(n => !isNaN(n));
-      const nextNum = nums.length > 0 ? Math.max(...nums) + 1 : 1;
-      const newId = `${prefix}-${String(nextNum).padStart(3, "0")}`;
-
-      const newDoc: DocItem = {
-        id: newId, title: form.title, tag: form.tag, status: form.status,
-        date: today(), allowedRoles: form.allowedRoles,
-        fileUrl: form.fileUrl || undefined, fileName: form.fileName || undefined
-      };
-      onSectionsChange({
-        ...sections,
-        [section]: { ...sections[section], items: [...sections[section].items, newDoc] }
-      });
-      onDone();
-    };
-
-    return (
-      <div className="space-y-3">
-        <div>
-          <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>НАЗВАНИЕ</label>
-          <input className="sw-input w-full px-3 py-2 rounded text-sm" value={form.title}
-            onChange={e => setForm(p => ({ ...p, title: e.target.value }))} placeholder="Название документа" />
-        </div>
-        <div>
-          <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>ТЕГ</label>
-          <input className="sw-input w-full px-3 py-2 rounded text-sm" value={form.tag}
-            onChange={e => setForm(p => ({ ...p, tag: e.target.value }))} placeholder="Тактика" />
-        </div>
-        <div>
-          <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>СТАТУС</label>
-          <select className="sw-input w-full px-3 py-2 rounded text-sm" value={form.status}
-            onChange={e => setForm(p => ({ ...p, status: e.target.value }))}>
-            {["Актуально", "На ревизии", "Пересмотр", "Архив", "Секретно"].map(s => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="font-mono-sw text-xs block mb-2" style={{ color: "var(--sw-text-dim)" }}>ДОСТУП ДЛЯ РОЛЕЙ</label>
-          <div className="flex gap-4">
-            {(["admin", "pilot", "engineer"] as Role[]).map(r => (
-              <label key={r} className="flex items-center gap-1.5 cursor-pointer">
-                <input type="checkbox" checked={form.allowedRoles.includes(r)}
-                  onChange={() => toggleRole(r)} className="accent-orange-400" />
-                <span className="font-rajdhani text-sm" style={{ color: "#8fa8bf" }}>{ROLE_LABELS[r]}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-        <div>
-          <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>ФАЙЛ (необязательно)</label>
-          <input type="file" ref={localRef} className="hidden" onChange={handleFile} />
-          <button onClick={() => localRef.current?.click()}
-            className="w-full py-2 rounded text-sm font-mono-sw"
-            style={{ border: "1px dashed var(--sw-border)", color: "var(--sw-text-dim)", background: "transparent" }}>
-            {form.fileName ? `📎 ${form.fileName}` : "Выбрать файл..."}
-          </button>
-        </div>
-        {err && <p className="font-mono-sw text-xs" style={{ color: "#ef4444" }}>{err}</p>}
-        <div className="flex gap-2 pt-2">
-          <button onClick={save} className="flex-1 py-2 rounded font-orbitron text-xs font-bold"
-            style={{ background: "var(--sw-orange)", color: "#070b0f" }}>ДОБАВИТЬ</button>
-          <button onClick={onDone} className="flex-1 py-2 rounded font-orbitron text-xs font-bold"
-            style={{ border: "1px solid var(--sw-border)", color: "var(--sw-text-dim)", background: "transparent" }}>ОТМЕНА</button>
-        </div>
-      </div>
-    );
-  }
-
-  // Форма редактирования документа
-  function EditDocForm({ section, doc, onDone }: { section: Section; doc: DocItem; onDone: () => void }) {
-    const [form, setForm] = useState({ ...doc });
-    const [err, setErr] = useState("");
-    const localRef = useRef<HTMLInputElement>(null);
-
-    const toggleRole = (r: Role) => {
-      setForm(f => ({
-        ...f,
-        allowedRoles: f.allowedRoles.includes(r)
-          ? f.allowedRoles.filter(x => x !== r)
-          : [...f.allowedRoles, r]
-      }));
-    };
-
-    const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      const url = URL.createObjectURL(file);
-      setForm(p => ({ ...p, fileUrl: url, fileName: file.name }));
-    };
-
-    const save = () => {
-      if (!form.title || !form.tag) { setErr("Укажите название и тег"); return; }
-      onSectionsChange({
-        ...sections,
-        [section]: {
-          ...sections[section],
-          items: sections[section].items.map(i => i.id === form.id ? { ...form, date: today() } : i)
-        }
-      });
-      onDone();
-    };
-
-    return (
-      <div className="space-y-3">
-        <div>
-          <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>НАЗВАНИЕ</label>
-          <input className="sw-input w-full px-3 py-2 rounded text-sm" value={form.title}
-            onChange={e => setForm(p => ({ ...p, title: e.target.value }))} />
-        </div>
-        <div>
-          <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>ТЕГ</label>
-          <input className="sw-input w-full px-3 py-2 rounded text-sm" value={form.tag}
-            onChange={e => setForm(p => ({ ...p, tag: e.target.value }))} />
-        </div>
-        <div>
-          <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>СТАТУС</label>
-          <select className="sw-input w-full px-3 py-2 rounded text-sm" value={form.status}
-            onChange={e => setForm(p => ({ ...p, status: e.target.value }))}>
-            {["Актуально", "На ревизии", "Пересмотр", "Архив", "Секретно"].map(s => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="font-mono-sw text-xs block mb-2" style={{ color: "var(--sw-text-dim)" }}>ДОСТУП ДЛЯ РОЛЕЙ</label>
-          <div className="flex gap-4">
-            {(["admin", "pilot", "engineer"] as Role[]).map(r => (
-              <label key={r} className="flex items-center gap-1.5 cursor-pointer">
-                <input type="checkbox" checked={form.allowedRoles.includes(r)}
-                  onChange={() => toggleRole(r)} className="accent-orange-400" />
-                <span className="font-rajdhani text-sm" style={{ color: "#8fa8bf" }}>{ROLE_LABELS[r]}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-        <div>
-          <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>ФАЙЛ</label>
-          <input type="file" ref={localRef} className="hidden" onChange={handleFile} />
-          <button onClick={() => localRef.current?.click()}
-            className="w-full py-2 rounded text-sm font-mono-sw"
-            style={{ border: "1px dashed var(--sw-border)", color: "var(--sw-text-dim)", background: "transparent" }}>
-            {form.fileName ? `📎 ${form.fileName}` : "Заменить файл..."}
-          </button>
-        </div>
-        {err && <p className="font-mono-sw text-xs" style={{ color: "#ef4444" }}>{err}</p>}
-        <div className="flex gap-2 pt-2">
-          <button onClick={save} className="flex-1 py-2 rounded font-orbitron text-xs font-bold"
-            style={{ background: "var(--sw-orange)", color: "#070b0f" }}>СОХРАНИТЬ</button>
-          <button onClick={onDone} className="flex-1 py-2 rounded font-orbitron text-xs font-bold"
-            style={{ border: "1px solid var(--sw-border)", color: "var(--sw-text-dim)", background: "transparent" }}>ОТМЕНА</button>
-        </div>
-      </div>
-    );
-  }
 
   const deleteUser = (id: string) => {
     onUsersChange(users.filter(u => u.id !== id));
@@ -883,12 +845,12 @@ function AdminPanel({
       {/* Модалки */}
       {addUserOpen && (
         <Modal title="ДОБАВИТЬ АККАУНТ" onClose={() => setAddUserOpen(false)}>
-          <AddUserForm onDone={() => setAddUserOpen(false)} />
+          <AddUserForm users={users} onUsersChange={onUsersChange} onDone={() => setAddUserOpen(false)} />
         </Modal>
       )}
       {editUser && (
         <Modal title="РЕДАКТИРОВАТЬ АККАУНТ" onClose={() => setEditUser(null)}>
-          <EditUserForm user={editUser} onDone={() => setEditUser(null)} />
+          <EditUserForm editTarget={editUser} users={users} onUsersChange={onUsersChange} onDone={() => setEditUser(null)} />
         </Modal>
       )}
       {deleteConfirm && (
@@ -914,12 +876,12 @@ function AdminPanel({
       )}
       {addDocSection && (
         <Modal title={`ДОБАВИТЬ ДОКУМЕНТ — ${SECTION_LABELS[addDocSection].toUpperCase()}`} onClose={() => setAddDocSection(null)}>
-          <AddDocForm section={addDocSection} onDone={() => setAddDocSection(null)} />
+          <AddDocForm section={addDocSection} sections={sections} onSectionsChange={onSectionsChange} onDone={() => setAddDocSection(null)} />
         </Modal>
       )}
       {editDoc && (
         <Modal title={`РЕДАКТИРОВАТЬ — [${editDoc.doc.id}]`} onClose={() => setEditDoc(null)}>
-          <EditDocForm section={editDoc.section} doc={editDoc.doc} onDone={() => setEditDoc(null)} />
+          <EditDocForm section={editDoc.section} doc={editDoc.doc} sections={sections} onSectionsChange={onSectionsChange} onDone={() => setEditDoc(null)} />
         </Modal>
       )}
 

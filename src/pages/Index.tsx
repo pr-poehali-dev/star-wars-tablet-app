@@ -942,6 +942,10 @@ function MainTerminal({
   const [searchQuery, setSearchQuery] = useState("");
   const [time, setTime] = useState(new Date());
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
+  const [changePassOpen, setChangePassOpen] = useState(false);
+  const [passForm, setPassForm] = useState({ current: "", next: "", confirm: "" });
+  const [passErr, setPassErr] = useState("");
+  const [passOk, setPassOk] = useState(false);
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
@@ -1030,6 +1034,12 @@ function MainTerminal({
                 {user.rank}
               </div>
             </div>
+            <button onClick={() => { setPassForm({ current: "", next: "", confirm: "" }); setPassErr(""); setPassOk(false); setChangePassOpen(true); }}
+              className="p-1.5 rounded transition-all"
+              style={{ border: "1px solid rgba(245,166,35,0.3)", color: "var(--sw-orange)", background: "transparent" }}
+              title="Сменить пароль">
+              <Icon name="KeyRound" size={14} />
+            </button>
             <button onClick={onLogout} className="p-1.5 rounded transition-all"
               style={{ border: "1px solid rgba(239,68,68,0.3)", color: "#ef4444", background: "transparent" }}
               title="Выход">
@@ -1038,6 +1048,62 @@ function MainTerminal({
           </div>
         </div>
       </header>
+
+      {changePassOpen && (
+        <Modal title="СМЕНА ПАРОЛЯ" onClose={() => setChangePassOpen(false)}>
+          {passOk ? (
+            <div className="text-center py-4 space-y-3">
+              <Icon name="CheckCircle" size={36} style={{ color: "#22c55e", margin: "0 auto" }} />
+              <p className="font-mono-sw text-sm" style={{ color: "#22c55e" }}>ПАРОЛЬ УСПЕШНО ИЗМЕНЁН</p>
+              <button onClick={() => setChangePassOpen(false)}
+                className="w-full py-2 rounded font-orbitron text-xs font-bold"
+                style={{ background: "var(--sw-orange)", color: "#070b0f" }}>
+                ЗАКРЫТЬ
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {[
+                { label: "ТЕКУЩИЙ ПАРОЛЬ", key: "current" },
+                { label: "НОВЫЙ ПАРОЛЬ", key: "next" },
+                { label: "ПОВТОРИТЕ НОВЫЙ", key: "confirm" },
+              ].map(f => (
+                <div key={f.key}>
+                  <label className="font-mono-sw text-xs block mb-1" style={{ color: "var(--sw-text-dim)" }}>{f.label}</label>
+                  <input
+                    type="password"
+                    className="sw-input w-full px-3 py-2 rounded text-sm"
+                    placeholder="••••••••"
+                    value={(passForm as Record<string, string>)[f.key]}
+                    onChange={e => setPassForm(p => ({ ...p, [f.key]: e.target.value }))}
+                  />
+                </div>
+              ))}
+              {passErr && <p className="font-mono-sw text-xs" style={{ color: "#ef4444" }}>{passErr}</p>}
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => {
+                    if (!passForm.current || !passForm.next || !passForm.confirm) { setPassErr("Заполните все поля"); return; }
+                    if (passForm.current !== user.password) { setPassErr("Текущий пароль неверен"); return; }
+                    if (passForm.next.length < 4) { setPassErr("Минимум 4 символа"); return; }
+                    if (passForm.next !== passForm.confirm) { setPassErr("Пароли не совпадают"); return; }
+                    onUsersChange(users.map(u => u.id === user.id ? { ...u, password: passForm.next } : u));
+                    setPassOk(true);
+                  }}
+                  className="flex-1 py-2 rounded font-orbitron text-xs font-bold"
+                  style={{ background: "var(--sw-orange)", color: "#070b0f" }}>
+                  СОХРАНИТЬ
+                </button>
+                <button onClick={() => setChangePassOpen(false)}
+                  className="flex-1 py-2 rounded font-orbitron text-xs font-bold"
+                  style={{ border: "1px solid var(--sw-border)", color: "var(--sw-text-dim)", background: "transparent" }}>
+                  ОТМЕНА
+                </button>
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
 
       {/* ТЕЛО */}
       <div className="flex flex-1 overflow-hidden">
